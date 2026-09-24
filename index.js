@@ -22,7 +22,10 @@ class TaskManager {
 
     return Math.max(...this.tasks.map(task => task.id)) + 1;
   }
-  getTasks() {
+  getTasks(filter) {
+    if (filter) {
+      return this.tasks.filter(task => task.status === filter)
+    }
     return this.tasks;
   }
   addTask(description) {
@@ -32,16 +35,28 @@ class TaskManager {
   }
   updateTask(id, description) {
     let task = this.tasks.find(task => task.id === Number(id));
-    console.log(task);
     
     if (!task) {
       console.error(`No task with id ${id}.`);
+      return;
     }
     if (description) {
       task.description = description;
     }
     task.updatedAt = Date.now();
-    return task;
+  }
+  updateStatus(id, status) {
+    let task = this.tasks.find(task => task.id === Number(id));
+
+    if (!task) {
+      console.error(`No task with id ${id}`);
+      return;
+    }
+    task.status = status;
+    task.updatedAt = Date.now();
+  }
+  deleteTask(id) {
+    this.tasks = this.tasks.filter(task => task.id !== Number(id));
   }
 }
 
@@ -63,11 +78,18 @@ async function saveTasks(tasks) {
       JSON.stringify(tasks)
     );
   } catch (error) {
-    console.error('Unable to add task, try again.');
+    console.error('Unable to save task, try again.');
   }
 }
 
-function displayTasks(tasks) {
+function displayTasks(taskManager) {
+  const VALID_FILTERS = ['done', 'todo', 'in-progress'];
+  let filter = process.argv[3];
+  if (filter && !VALID_FILTERS.includes(filter)) {
+    console.error('Invalid filter chosen');
+    return;
+  }
+  let tasks = taskManager.getTasks(filter);
   console.log(tasks.map(task => {
     return `ID: ${task.id}
     Description: ${task.description}
@@ -94,8 +116,43 @@ async function updateTask(taskManager) {
 
   if (!id || !description) {
     console.error('Field missing.');
+    return;
   }
-  let task = taskManager.updateTask(id, description);
+  taskManager.updateTask(id, description);
+  await saveTasks(taskManager.getTasks());
+}
+
+async function markInProgress(taskManager) {
+  let id = process.argv[3];
+  
+  if (!id) {
+    console.error('Field missing.');
+    return;
+  }
+  taskManager.updateStatus(id, 'in-progress');
+  await saveTasks(taskManager.getTasks());
+}
+
+async function markDone(taskManager) {
+  let id = process.argv[3];
+
+  if (!id) {
+    console.error('Field missing.');
+    return;
+  }
+  taskManager.updateStatus(id, 'done');
+  await saveTasks(taskManager.getTasks());
+}
+
+async function deleteTask(taskManager) {
+  let id = process.argv[3];
+
+  if (!id) {
+    console.error('No id given');
+    return;
+  }
+
+  taskManager.deleteTask(id);
   await saveTasks(taskManager.getTasks());
 }
 
@@ -113,19 +170,22 @@ async function updateTask(taskManager) {
 
   switch (operation) {
     case 'add':
-      addTask(taskManager);
+      await addTask(taskManager);
       break;
     case 'list':
-      displayTasks(taskManager.getTasks());
+      displayTasks(taskManager);
       break;
     case 'update':
-      updateTask(taskManager);
+      await updateTask(taskManager);
       break;
     case 'delete':
+      await deleteTask(taskManager);
       break;
     case 'mark-in-progress':
+      await markInProgress(taskManager);
       break;  
     case 'mark-done':
+      await markDone(taskManager);
       break;
     default:
       break;
